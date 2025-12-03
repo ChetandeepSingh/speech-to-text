@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text - Real-time Transcription</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --danger: #ef4444;
+            --danger-dark: #dc2626;
+            --success: #22c55e;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .app {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 0;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .header h1 .icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            color: var(--primary);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Main Card */
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        /* Recording Section */
+        .recording-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .record-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+        }
+
+        .record-btn svg {
+            width: 3rem;
+            height: 3rem;
+            color: white;
+        }
+
+        .record-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .record-btn.recording {
+            background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+            box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
+            animation: pulse-ring 1.5s ease-out infinite;
+        }
+
+        .record-btn.recording:hover {
+            box-shadow: 0 12px 40px rgba(239, 68, 68, 0.4);
+        }
+
+        .record-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .status-text.recording {
+            color: var(--danger);
+        }
+
+        .status-text.recording::before {
+            content: "●";
+            margin-right: 0.5rem;
+            animation: blink 1s infinite;
+        }
+
+        .status-text.processing {
+            color: var(--primary);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        /* Language Selection */
+        .language-section {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+        }
+
+        .language-select {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1.25rem;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            min-width: 200px;
+        }
+
+        .language-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        /* Transcript Section */
+        .transcript-section {
+            margin-top: 1.5rem;
+        }
+
+        .transcript-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .transcript-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .transcript-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: var(--bg-input);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn svg {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .transcript-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+        }
+
+        .transcript-box:empty::before {
+            content: "Click the microphone button and start speaking...";
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .transcribing-indicator {
+            display: none;
+            margin-bottom: 0.75rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            letter-spacing: 0.02em;
+        }
+
+        .transcribing-indicator.show {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .transcribing-indicator::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+            animation: pulse-dot 1.5s ease-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+            }
+        }
+
+        /* Error Message */
+        .error-box {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            color: #fca5a5;
+            display: none;
+        }
+
+        .error-box.show {
+            display: block;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 0.875rem 1.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Info Section */
+        .info-section {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .info-item {
+            background: var(--bg-input);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .info-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .info-value.ready {
+            color: var(--success);
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .header h1 {
+                font-size: 1.75rem;
+            }
+
+            .record-btn {
+                width: 100px;
+                height: 100px;
+                font-size: 2.5rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .transcript-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1><span class="icon" id="headerIcon"></span> Speech to Text</h1>
+            <p>Real-time multilingual transcription powered by Whisper AI</p>
+        </header>
+
+        <main class="card">
+            <div class="recording-section">
+                <button id="recordBtn" class="record-btn" title="Click to start recording">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"></path>
+                        <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+                    </svg>
+                </button>
+                <span id="statusText" class="status-text">Click to start recording</span>
+            </div>
+
+            <div class="language-section">
+                <select id="languageSelect" class="language-select">
+                    <option value="">Auto-detect Language</option>
+                    <option value="en">English</option>
+                    <option value="hi">Hindi</option>
+                    <option value="ta">Tamil</option>
+                    <option value="te">Telugu</option>
+                    <option value="bn">Bengali</option>
+                    <option value="mr">Marathi</option>
+                    <option value="gu">Gujarati</option>
+                    <option value="kn">Kannada</option>
+                    <option value="ml">Malayalam</option>
+                    <option value="pa">Punjabi</option>
+                    <option value="ur">Urdu</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="zh">Chinese</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ar">Arabic</option>
+                </select>
+            </div>
+
+            <div class="transcript-section">
+                <div class="transcript-header">
+                    <span class="transcript-title" id="transcriptTitle"></span>
+                    <div class="transcript-actions">
+                        <button id="copyBtn" class="action-btn" title="Copy to clipboard">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+                            Copy
+                        </button>
+                        <button id="clearBtn" class="action-btn" title="Clear transcript">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 4 21 4"></polyline><path d="M19 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4m3 0v-1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path><line x1="10" y1="12" x2="10" y2="17"></line><line x1="14" y1="12" x2="14" y2="17"></line></svg>
+                            Clear
+                        </button>
+                    </div>
+                </div>
+                <div id="transcribingIndicator" class="transcribing-indicator">Processing audio...</div>
+                <div id="transcript" class="transcript-box"></div>
+                <div id="errorBox" class="error-box"></div>
+            </div>
+
+            <div class="info-section">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Status</div>
+                        <div id="serverStatus" class="info-value ready">Ready</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Model</div>
+                        <div class="info-value">Whisper Base</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Audio Format</div>
+                        <div id="audioFormat" class="info-value">--</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+
+        // State
+        let isRecording = false;
+        let isProcessing = false;
+        let mediaRecorder = null;
+        let audioStream = null;
+        let audioChunks = [];
+        let fullTranscript = '';
+        let chunkIntervalId = null;
+        const CHUNK_INTERVAL_MS = 3000; // Send audio every 3 seconds for transcription
+
+        // DOM Elements
+        const recordBtn = document.getElementById('recordBtn');
+        const statusText = document.getElementById('statusText');
+        const languageSelect = document.getElementById('languageSelect');
+        const transcriptBox = document.getElementById('transcript');
+        const errorBox = document.getElementById('errorBox');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const serverStatus = document.getElementById('serverStatus');
+        const audioFormatEl = document.getElementById('audioFormat');
+        const toast = document.getElementById('toast');
+        const transcribingIndicator = document.getElementById('transcribingIndicator');
+        const transcriptTitle = document.getElementById('transcriptTitle');
+        const headerIcon = document.getElementById('headerIcon');
+
+        // Initialize header icon
+        const headerSvg = document.createElement('svg');
+        headerSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        headerSvg.setAttribute('width', '24');
+        headerSvg.setAttribute('height', '24');
+        headerSvg.setAttribute('viewBox', '0 0 24 24');
+        headerSvg.setAttribute('fill', 'none');
+        headerSvg.setAttribute('stroke', 'currentColor');
+        headerSvg.setAttribute('stroke-width', '2');
+        headerSvg.setAttribute('stroke-linecap', 'round');
+        headerSvg.setAttribute('stroke-linejoin', 'round');
+        headerSvg.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"></path><circle cx="12" cy="12" r="3" fill="currentColor"></circle>';
+        headerIcon.appendChild(headerSvg);
+
+        // Initialize transcript title
+        const titleSvg = document.createElement('svg');
+        titleSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        titleSvg.setAttribute('width', '24');
+        titleSvg.setAttribute('height', '24');
+        titleSvg.setAttribute('viewBox', '0 0 24 24');
+        titleSvg.setAttribute('fill', 'none');
+        titleSvg.setAttribute('stroke', 'currentColor');
+        titleSvg.setAttribute('stroke-width', '2');
+        titleSvg.setAttribute('stroke-linecap', 'round');
+        titleSvg.setAttribute('stroke-linejoin', 'round');
+        titleSvg.innerHTML = '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>';
+        transcriptTitle.appendChild(titleSvg);
+        transcriptTitle.appendChild(document.createTextNode('Transcript'));
+
+        // Utility Functions
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function showError(message) {
+            errorBox.textContent = '⚠️ ' + message;
+            errorBox.classList.add('show');
+            setTimeout(() => errorBox.classList.remove('show'), 8000);
+        }
+
+        function setProcessingIndicator(active, label = 'Processing audio...') {
+            if (active) {
+                transcribingIndicator.textContent = label;
+                transcribingIndicator.classList.add('show');
+            } else {
+                transcribingIndicator.classList.remove('show');
+            }
+        }
+
+        function addTextToTranscript(text) {
+            const trimmed = text.trim();
+            if (!trimmed) return;
+
+            if (!fullTranscript) {
+                fullTranscript = trimmed;
+            } else {
+                // Add space or newline between chunks
+                fullTranscript += ' ' + trimmed;
+            }
+
+            transcriptBox.textContent = fullTranscript;
+            transcriptBox.scrollTop = transcriptBox.scrollHeight;
+        }
+
+        function updateUI(recording) {
+            isRecording = recording;
+            
+            if (recording) {
+                recordBtn.classList.add('recording');
+                const stopSvg = document.createElement('svg');
+                stopSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                stopSvg.setAttribute('width', '24');
+                stopSvg.setAttribute('height', '24');
+                stopSvg.setAttribute('viewBox', '0 0 24 24');
+                stopSvg.setAttribute('fill', 'currentColor');
+                stopSvg.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+                recordBtn.innerHTML = '';
+                recordBtn.appendChild(stopSvg);
+                recordBtn.title = 'Click to stop recording';
+                statusText.textContent = 'Recording...';
+                statusText.classList.add('recording');
+                statusText.classList.remove('processing');
+            } else if (isProcessing) {
+                recordBtn.classList.remove('recording');
+                const micSvg = document.createElement('svg');
+                micSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                micSvg.setAttribute('width', '24');
+                micSvg.setAttribute('height', '24');
+                micSvg.setAttribute('viewBox', '0 0 24 24');
+                micSvg.setAttribute('fill', 'none');
+                micSvg.setAttribute('stroke', 'currentColor');
+                micSvg.setAttribute('stroke-width', '2');
+                micSvg.setAttribute('stroke-linecap', 'round');
+                micSvg.setAttribute('stroke-linejoin', 'round');
+                micSvg.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"></path><circle cx="12" cy="12" r="3" fill="currentColor"></circle>';
+                recordBtn.innerHTML = '';
+                recordBtn.appendChild(micSvg);
+                recordBtn.disabled = true;
+                statusText.textContent = 'Processing final audio...';
+                statusText.classList.remove('recording');
+                statusText.classList.add('processing');
+            } else {
+                recordBtn.classList.remove('recording');
+                const micSvg = document.createElement('svg');
+                micSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                micSvg.setAttribute('width', '24');
+                micSvg.setAttribute('height', '24');
+                micSvg.setAttribute('viewBox', '0 0 24 24');
+                micSvg.setAttribute('fill', 'none');
+                micSvg.setAttribute('stroke', 'currentColor');
+                micSvg.setAttribute('stroke-width', '2');
+                micSvg.setAttribute('stroke-linecap', 'round');
+                micSvg.setAttribute('stroke-linejoin', 'round');
+                micSvg.innerHTML = '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"></path><circle cx="12" cy="12" r="3" fill="currentColor"></circle>';
+                recordBtn.innerHTML = '';
+                recordBtn.appendChild(micSvg);
+                recordBtn.title = 'Click to start recording';
+                recordBtn.disabled = false;
+                statusText.textContent = 'Click to start recording';
+                statusText.classList.remove('recording');
+                statusText.classList.remove('processing');
+            }
+        }
+
+        // Send audio to server for transcription
+        async function sendAudioForTranscription(audioBlob) {
+            if (!audioBlob || audioBlob.size < 100) {
+                console.log('Audio too small, skipping');
+                return;
+            }
+
+            setProcessingIndicator(true, 'Transcribing...');
+            serverStatus.textContent = 'Transcribing...';
+            serverStatus.classList.remove('ready');
+
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('language', languageSelect.value);
+
+                console.log('Sending audio for transcription:', audioBlob.size, 'bytes');
+
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                console.log('Server response:', data);
+
+                if (data.success && data.text) {
+                    console.log('Transcript received:', data.text);
+                    addTextToTranscript(data.text);
+                } else if (data.error) {
+                    console.error('Transcription error:', data.error);
+                    showError(data.error);
+                }
+
+            } catch (err) {
+                console.error('Failed to send audio:', err);
+                showError('Failed to connect to server: ' + err.message);
+            } finally {
+                setProcessingIndicator(false);
+                serverStatus.textContent = 'Ready';
+                serverStatus.classList.add('ready');
+            }
+        }
+
+        // Process accumulated audio chunks
+        async function processAudioChunks() {
+            if (audioChunks.length === 0) return;
+
+            // Create blob from all accumulated chunks
+            const mimeType = mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
+            const audioBlob = new Blob(audioChunks, { type: mimeType });
+            
+            // Clear chunks after creating blob
+            audioChunks = [];
+            
+            await sendAudioForTranscription(audioBlob);
+        }
+
+        // Recording Functions
+        async function startRecording() {
+            try {
+                errorBox.classList.remove('show');
+                audioChunks = [];
+                
+                // Get microphone access
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        sampleRate: 16000,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                
+                // Determine supported MIME type
+                let mimeType = 'audio/webm';
+                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                    mimeType = 'audio/webm;codecs=opus';
+                } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    mimeType = 'audio/webm';
+                } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+                    mimeType = 'audio/ogg;codecs=opus';
+                }
+                
+                audioFormatEl.textContent = mimeType.split(';')[0].split('/')[1].toUpperCase();
+                
+                // Create MediaRecorder
+                mediaRecorder = new MediaRecorder(audioStream, { mimeType });
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data && event.data.size > 0) {
+                        console.log('Audio chunk available:', event.data.size, 'bytes');
+                        audioChunks.push(event.data);
+                    }
+                };
+                
+                mediaRecorder.onerror = (err) => {
+                    console.error('MediaRecorder error:', err);
+                    showError('Recording error: ' + (err.error?.message || 'Unknown error'));
+                    stopRecording();
+                };
+                
+                // Start recording - collect chunks every second
+                mediaRecorder.start(1000);
+                updateUI(true);
+                
+                // Set up interval to send audio for transcription
+                chunkIntervalId = setInterval(async () => {
+                    if (isRecording && audioChunks.length > 0) {
+                        // Create a copy of chunks to process
+                        const chunksToProcess = [...audioChunks];
+                        const mimeType = mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
+                        const audioBlob = new Blob(chunksToProcess, { type: mimeType });
+                        await sendAudioForTranscription(audioBlob);
+                    }
+                }, CHUNK_INTERVAL_MS);
+                
+            } catch (err) {
+                console.error('Failed to start recording:', err);
+                
+                if (err.name === 'NotAllowedError') {
+                    showError('Microphone access denied. Please allow microphone access and try again.');
+                } else if (err.name === 'NotFoundError') {
+                    showError('No microphone found. Please connect a microphone and try again.');
+                } else {
+                    showError('Failed to start recording: ' + err.message);
+                }
+                
+                stopRecording();
+            }
+        }
+
+        async function stopRecording() {
+            // Clear the interval first
+            if (chunkIntervalId) {
+                clearInterval(chunkIntervalId);
+                chunkIntervalId = null;
+            }
+            
+            isProcessing = true;
+            updateUI(false);
+            
+            // Stop MediaRecorder and wait for final data
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                await new Promise(resolve => {
+                    mediaRecorder.onstop = resolve;
+                    mediaRecorder.stop();
+                });
+            }
+            
+            // Stop audio tracks
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            
+            // Process any remaining audio chunks
+            if (audioChunks.length > 0) {
+                console.log('Processing final audio chunks...');
+                const mimeType = mediaRecorder?.mimeType || 'audio/webm;codecs=opus';
+                const audioBlob = new Blob(audioChunks, { type: mimeType });
+                await sendAudioForTranscription(audioBlob);
+            }
+            
+            mediaRecorder = null;
+            audioChunks = [];
+            isProcessing = false;
+            updateUI(false);
+        }
+
+        async function toggleRecording() {
+            if (isRecording) {
+                await stopRecording();
+            } else if (!isProcessing) {
+                await startRecording();
+            }
+        }
+
+        // Event Listeners
+        recordBtn.addEventListener('click', toggleRecording);
+
+        copyBtn.addEventListener('click', async () => {
+            if (!fullTranscript) {
+                showToast('Nothing to copy');
+                return;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(fullTranscript);
+                showToast('✓ Copied to clipboard');
+            } catch (err) {
+                showError('Failed to copy: ' + err.message);
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            fullTranscript = '';
+            transcriptBox.textContent = '';
+            showToast('✓ Transcript cleared');
+        });
+
+        // Prevent language change while recording
+        languageSelect.addEventListener('mousedown', (e) => {
+            if (isRecording || isProcessing) {
+                e.preventDefault();
+                showToast('Stop recording first to change language');
+            }
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (chunkIntervalId) {
+                clearInterval(chunkIntervalId);
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        // Keyboard shortcut: Space to toggle recording
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && e.target === document.body) {
+                e.preventDefault();
+                toggleRecording();
+            }
+        });
+    </script>
+</body>
+</html>
